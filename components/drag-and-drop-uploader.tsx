@@ -20,6 +20,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { ShareFileDialog } from "./share-file-dialog"
+import { pathlib } from "path-browserify"
 
 interface DroppedFile {
   name: string
@@ -27,6 +28,8 @@ interface DroppedFile {
   content: string
   id?: string
   uploadedAt?: string
+  fixed?: boolean
+  originalContent?: string
 }
 
 // Supported file types
@@ -47,6 +50,183 @@ const SUPPORTED_FILE_TYPES = [
   ".xml",
   ".csv",
 ]
+
+// Script Fixer integration for the UI
+class ScriptFixerIntegration {
+  cache: Map<string, string>
+  
+  constructor() {
+    this.cache = new Map()
+  }
+
+  async fixScript(content: any, fileType: any) {
+    // Hash the content for caching
+    const contentHash = await this.hashString(content)
+    const cacheKey = `${contentHash}_${fileType}`
+    
+    if (this.cache.has(cacheKey)) {
+      return this.cache.get(cacheKey)
+    }
+    
+    // Apply fixes based on file type
+    let fixed = content
+    
+    if (fileType === '.py') {
+      fixed = this.normalizePathsInPython(content)
+      fixed = this.addPortableHeader(fixed)
+      fixed = this.fixDependencies(fixed)
+    } else if (['.js', '.ts', '.jsx', '.tsx'].includes(fileType)) {
+      fixed = this.normalizePathsInJS(content)
+    }
+    
+    // Cache the result
+    this.cache.set(cacheKey, fixed)
+    return fixed
+  }
+  
+  normalizePathsInPython(content: any) {
+    // Simple regex-based path normalization for Python
+    return content.replace(
+      /(["'])(\/[^"'\n]+|[A-Z]:\\[^"'\n]+)(["'])/g, 
+      "Path(__file__).parent / $1${pathlib.basename('$2')}$3"
+    )
+  }
+  
+  normalizePathsInJS(content: any) {
+    // Path normalization for JS files
+    return content.replace(
+      /(["'])(\/[^"'\n]+|[A-Z]:\\[^"'\n]+)(["'])/g, 
+      "path.join(__dirname, $1${path.basename('$2')}$3)"
+    )
+  }
+  
+  addPortableHeader(content: any) {
+    const header = `#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+from pathlib import Path
+import sys
+
+__file__ = Path(__file__).resolve()
+`
+    return header + content
+  }
+  
+  fixDependencies(content: any) {
+    // Add auto-import capability
+    const autoImportHeader = `
+# Auto-dependency resolver
+try:
+    import importlib.util
+    import subprocess
+    import sys
+    
+    def ensure_import(package):
+        try:
+            return __import__(package)
+        except ImportError:
+            subprocess.check_call([sys.executable, '-m', 'pip', 'install', package])
+            return __import__(package)
+            
+`
+    
+    // Simple regex to find imports
+    const importMatches = content.match(/import\s+([a-zA-Z0-9_]+)/g) || []
+    const fromImportMatches = content.match(/from\s+([a-zA-Z0-9_]+)\s+import/g) || []
+    
+    let allPackages: string[] = []
+    
+    importMatches.forEach((match: any) => {
+      const pkg = match.replace('import', '').trim()
+      if (!['sys', 'os', 'pathlib', 'Path'].includes(pkg)) {
+        allPackages.push(pkg)
+      }
+    })
+    
+    fromImportMatches.forEach((match: any) => {
+      const pkg = match.replace('from', '').replace('import', '').trim()
+      if (!['sys', 'os', 'pathlib', 'Path'].includes(pkg)) {
+        allPackages.push(pkg)
+      }
+    })
+    
+    if (allPackages.length > 0) {
+      let autoImports = autoImportHeader
+      allPackages.forEach(pkg => {
+        autoImports += `${pkg} = ensure_import('${pkg}')\n`
+      })
+      autoImports += '\n# End auto-dependency resolver\n\n'
+      
+      return autoImports + content
+    }
+    
+    return content
+  }
+  
+  async hashString(str: string) {
+    const encoder = new TextEncoder()
+    const data = encoder.encode(str)
+    const hashBuffer = await crypto.subtle.digest('SHA-256', data)
+    const hashArray = Array.from(new Uint8Array(hashBuffer))
+    return hashArray.map(b => b.toString(16).padStart(2, '0')).join('')
+  }
+    def ensure_import(package):
+        try:
+            return __import__(package)
+        except ImportError:
+            subprocess.check_call([sys.executable, '-m', 'pip', 'install', package])
+            return __import__(package)
+            
+`
+    
+    // Simple regex to find imports
+    const importMatches = content.match(/import\s+([a-zA-Z0-9_]+)/g) || []
+    const fromImportMatches = content.match(/from\s+([a-zA-Z0-9_]+)\s+import/g) || []
+    
+    let allPackages: string[] = []
+    
+    importMatches.forEach((match: any) => {
+      const pkg = match.replace('import', '').trim()
+      if (!['sys', 'os', 'pathlib', 'Path'].includes(pkg)) {
+        allPackages.push(pkg)
+      }
+    })
+    
+    fromImportMatches.forEach((match: any) => {
+      const pkg = match.replace('from', '').replace('import', '').trim()
+      if (!['sys', 'os', 'pathlib', 'Path'].includes(pkg)) {
+        allPackages.push(pkg)
+      }
+    })
+    
+    if (allPackages.length > 0) {
+      let autoImports = autoImportHeader
+      allPackages.forEach(pkg => {
+        autoImports += `${pkg} = ensure_import('${pkg}')\n`
+      })
+      autoImports += '\n# End auto-dependency resolver\n\n'
+      
+      return autoImports + content
+    }
+    
+    return content
+  }
+  
+  async hashString(str: string) {
+    const encoder = new TextEncoder()
+    const data = encoder.encode(str)
+    const hashBuffer = await crypto.subtle.digest('SHA-256', data)
+    const hashArray = Array.from(new Uint8Array(hashBuffer))
+    return hashArray.map(b => b.toString(16).padStart(2, '0')).join('')
+  }
+
+  async hashString(str: string) {
+    const encoder = new TextEncoder()
+    const data = encoder.encode(str)
+    const hashBuffer = await crypto.subtle.digest('SHA-256', data)
+    const hashArray = Array.from(new Uint8Array(hashBuffer))
+    return hashArray.map(b => b.toString(16).padStart(2, '0')).join('')
+  }
+}
 
 // File type categories for filtering
 const FILE_TYPE_CATEGORIES = [
@@ -165,7 +345,9 @@ export default function DragAndDropUploader() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ filename, content }),
       })
-      if (!res.ok) throw new Error("Failed upload")
+      if (!res.ok) {
+        throw new Error("Failed upload")
+      }
     } catch (error) {
       console.error(error)
       throw error
@@ -175,7 +357,9 @@ export default function DragAndDropUploader() {
   const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault()
     e.stopPropagation()
-    if (!isDragging) setIsDragging(true)
+    if (!isDragging) {
+      setIsDragging(true)
+    }
   }
 
   const handleDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
@@ -230,7 +414,9 @@ export default function DragAndDropUploader() {
   }
 
   const handleSaveEdit = async () => {
-    if (!editFile) return
+    if (!editFile) {
+      return
+    }
 
     try {
       // Delete the old file
@@ -312,361 +498,4 @@ export default function DragAndDropUploader() {
   }
 
   const isCategorySelected = (category: string): boolean => {
-    const categoryExtensions = FILE_TYPE_CATEGORIES.find((c) => c.label === category)?.extensions || []
-    return categoryExtensions.every((ext) => selectedFileTypes.includes(ext))
-  }
-
-  const clearFilters = () => {
-    setSearchQuery("")
-    setSelectedFileTypes([])
-    setSortOrder("date")
-    setSortDirection("desc")
-  }
-
-  // Filter and sort files based on search query and selected file types
-  const filteredFiles = useMemo(() => {
-    let result = [...droppedFiles]
-
-    // Apply search filter
-    if (searchQuery) {
-      const query = searchQuery.toLowerCase()
-      result = result.filter(
-        (file) => file.name.toLowerCase().includes(query) || file.content.toLowerCase().includes(query),
-      )
-    }
-
-    // Apply file type filter
-    if (selectedFileTypes.length > 0) {
-      result = result.filter((file) => {
-        const extension = getFileExtension(file.name)
-        return selectedFileTypes.includes(extension)
-      })
-    }
-
-    // Apply sorting
-    result.sort((a, b) => {
-      let comparison = 0
-
-      switch (sortOrder) {
-        case "name":
-          comparison = a.name.localeCompare(b.name)
-          break
-        case "date":
-          comparison = (a.uploadedAt || "").localeCompare(b.uploadedAt || "")
-          break
-        case "type":
-          comparison = getFileExtension(a.name).localeCompare(getFileExtension(b.name))
-          break
-      }
-
-      return sortDirection === "asc" ? comparison : -comparison
-    })
-
-    return result
-  }, [droppedFiles, searchQuery, selectedFileTypes, sortOrder, sortDirection])
-
-  const handleSortChange = (newSortOrder: "name" | "date" | "type") => {
-    if (sortOrder === newSortOrder) {
-      // Toggle direction if clicking the same sort option
-      setSortDirection(sortDirection === "asc" ? "desc" : "asc")
-    } else {
-      // Set new sort order and reset direction to default
-      setSortOrder(newSortOrder)
-      setSortDirection("desc")
-    }
-  }
-
-  const handleShareFile = (filename: string) => {
-    setFileToShare(filename)
-    setShareDialogOpen(true)
-  }
-
-  return (
-    <div className="w-full h-full flex flex-col items-center justify-center">
-      <div className="w-full flex justify-between items-center mb-4">
-        <div>
-          <h2 className="text-xl font-bold text-slate-100">File Manager</h2>
-          <p className="text-sm text-slate-400">Upload and manage your code files</p>
-        </div>
-        <Button
-          onClick={fetchUploadedFiles}
-          variant="outline"
-          className="bg-slate-800/50 border-slate-700 text-slate-300"
-          disabled={isRefreshing}
-        >
-          <RefreshCw className={`h-4 w-4 mr-2 ${isRefreshing ? "animate-spin" : ""}`} />
-          Refresh
-        </Button>
-      </div>
-
-      <Card
-        className={`w-full max-w-2xl min-h-[200px] p-6 border-2 ${
-          isDragging ? "border-cyan-500" : "border-dashed border-slate-700"
-        } flex flex-col items-center justify-center text-center transition-colors duration-300 bg-slate-800/50 mb-6`}
-        onDrop={handleDrop}
-        onDragOver={handleDragOver}
-        onDragLeave={handleDragLeave}
-      >
-        {isLoading ? (
-          <div className="flex flex-col items-center">
-            <RefreshCw className="h-8 w-8 text-cyan-500 animate-spin mb-2" />
-            <p className="text-slate-300">Uploading files...</p>
-          </div>
-        ) : (
-          <>
-            <FileText className="h-12 w-12 text-slate-500 mb-4" />
-            <p className="text-lg font-semibold text-slate-100">
-              {isDragging ? "Release to upload files" : "Drag and drop code files here"}
-            </p>
-            <p className="text-sm text-slate-400 mt-2">Supported file types: {SUPPORTED_FILE_TYPES.join(", ")}</p>
-          </>
-        )}
-      </Card>
-
-      {droppedFiles.length > 0 && (
-        <div className="mt-2 w-full max-w-2xl space-y-4">
-          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-            <h3 className="text-lg font-semibold text-slate-100">
-              Uploaded Files ({filteredFiles.length} of {droppedFiles.length})
-            </h3>
-
-            <div className="flex flex-col md:flex-row gap-2 w-full md:w-auto">
-              {/* Search input */}
-              <div className="relative flex-grow">
-                <Input
-                  placeholder="Search files..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="bg-slate-800/50 border-slate-700 text-slate-100 pl-9 pr-8"
-                />
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-400" />
-                {searchQuery && (
-                  <button
-                    onClick={() => setSearchQuery("")}
-                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-slate-400 hover:text-slate-300"
-                  >
-                    <X className="h-4 w-4" />
-                  </button>
-                )}
-              </div>
-
-              {/* File type filter dropdown */}
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="outline" className="bg-slate-800/50 border-slate-700 text-slate-300">
-                    <Filter className="h-4 w-4 mr-2" />
-                    Filter
-                    {selectedFileTypes.length > 0 && (
-                      <Badge className="ml-2 bg-cyan-600">{selectedFileTypes.length}</Badge>
-                    )}
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent className="bg-slate-900 border-slate-700 text-slate-100">
-                  <DropdownMenuLabel>File Types</DropdownMenuLabel>
-                  <DropdownMenuSeparator className="bg-slate-700" />
-
-                  {FILE_TYPE_CATEGORIES.map((category) => (
-                    <DropdownMenuCheckboxItem
-                      key={category.label}
-                      checked={isCategorySelected(category.label)}
-                      onCheckedChange={() => toggleFileTypeFilter(category.label)}
-                      className="cursor-pointer"
-                    >
-                      {category.label}
-                      <span className="ml-2 text-xs text-slate-400">({category.extensions.join(", ")})</span>
-                    </DropdownMenuCheckboxItem>
-                  ))}
-
-                  <DropdownMenuSeparator className="bg-slate-700" />
-                  <DropdownMenuLabel>Sort By</DropdownMenuLabel>
-                  <DropdownMenuSeparator className="bg-slate-700" />
-
-                  <DropdownMenuCheckboxItem
-                    checked={sortOrder === "name"}
-                    onCheckedChange={() => handleSortChange("name")}
-                    className="cursor-pointer"
-                  >
-                    Name {sortOrder === "name" && (sortDirection === "asc" ? "↑" : "↓")}
-                  </DropdownMenuCheckboxItem>
-
-                  <DropdownMenuCheckboxItem
-                    checked={sortOrder === "date"}
-                    onCheckedChange={() => handleSortChange("date")}
-                    className="cursor-pointer"
-                  >
-                    Date {sortOrder === "date" && (sortDirection === "asc" ? "↑" : "↓")}
-                  </DropdownMenuCheckboxItem>
-
-                  <DropdownMenuCheckboxItem
-                    checked={sortOrder === "type"}
-                    onCheckedChange={() => handleSortChange("type")}
-                    className="cursor-pointer"
-                  >
-                    Type {sortOrder === "type" && (sortDirection === "asc" ? "↑" : "↓")}
-                  </DropdownMenuCheckboxItem>
-
-                  <DropdownMenuSeparator className="bg-slate-700" />
-                  <div className="px-2 py-1.5">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="w-full border-slate-700 text-slate-300"
-                      onClick={clearFilters}
-                    >
-                      Clear Filters
-                    </Button>
-                  </div>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
-          </div>
-
-          {/* Search and filter summary */}
-          {(searchQuery || selectedFileTypes.length > 0) && (
-            <div className="flex flex-wrap gap-2 items-center text-sm text-slate-400">
-              <span>Filters:</span>
-              {searchQuery && (
-                <Badge
-                  variant="outline"
-                  className="bg-slate-800 border-slate-600 text-slate-300 flex items-center gap-1"
-                >
-                  Search: {searchQuery}
-                  <button onClick={() => setSearchQuery("")}>
-                    <X className="h-3 w-3" />
-                  </button>
-                </Badge>
-              )}
-              {selectedFileTypes.length > 0 && (
-                <Badge
-                  variant="outline"
-                  className="bg-slate-800 border-slate-600 text-slate-300 flex items-center gap-1"
-                >
-                  Types: {selectedFileTypes.length}
-                  <button onClick={() => setSelectedFileTypes([])}>
-                    <X className="h-3 w-3" />
-                  </button>
-                </Badge>
-              )}
-              <Button variant="link" className="text-cyan-400 p-0 h-auto text-xs" onClick={clearFilters}>
-                Clear All
-              </Button>
-            </div>
-          )}
-
-          {filteredFiles.length === 0 ? (
-            <div className="bg-slate-800/50 border border-slate-700 rounded-md p-8 text-center">
-              <FileText className="h-12 w-12 text-slate-500 mx-auto mb-2" />
-              <p className="text-slate-300">No files match your search criteria</p>
-              <Button variant="link" className="text-cyan-400 mt-2" onClick={clearFilters}>
-                Clear filters
-              </Button>
-            </div>
-          ) : (
-            filteredFiles.map((file, idx) => (
-              <Card key={idx} className="p-4 bg-slate-800/50 border-slate-700 text-slate-100">
-                <div className="flex justify-between items-center mb-2">
-                  <div className="flex items-center">
-                    {getFileIcon(file.name)}
-                    <div className="font-bold ml-2">{file.name}</div>
-                  </div>
-                  <div className="flex space-x-2">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-8 w-8 p-0 text-slate-400 hover:text-cyan-400"
-                      onClick={() => handleShareFile(file.name)}
-                    >
-                      <Share2 className="h-4 w-4" />
-                      <span className="sr-only">Share</span>
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-8 w-8 p-0 text-slate-400 hover:text-cyan-400"
-                      onClick={() => handleEditFile(file)}
-                    >
-                      <Edit2 className="h-4 w-4" />
-                      <span className="sr-only">Edit</span>
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-8 w-8 p-0 text-slate-400 hover:text-cyan-400"
-                      onClick={() => handleDownloadFile(file)}
-                    >
-                      <Download className="h-4 w-4" />
-                      <span className="sr-only">Download</span>
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-8 w-8 p-0 text-slate-400 hover:text-red-400"
-                      onClick={() => handleDeleteFile(file.name)}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                      <span className="sr-only">Delete</span>
-                    </Button>
-                  </div>
-                </div>
-                {searchQuery && file.content.toLowerCase().includes(searchQuery.toLowerCase()) && (
-                  <div className="mb-2 px-2 py-1 bg-cyan-900/20 border border-cyan-800/30 rounded text-xs">
-                    <span className="font-semibold text-cyan-400">Content match:</span> Found "{searchQuery}" in file
-                    content
-                  </div>
-                )}
-                <pre className="mt-2 max-h-48 overflow-auto text-sm bg-slate-900/50 p-2 rounded text-slate-300">
-                  {file.content}
-                </pre>
-                {file.uploadedAt && (
-                  <div className="mt-2 text-xs text-slate-500">
-                    Uploaded: {new Date(file.uploadedAt).toLocaleString()}
-                  </div>
-                )}
-              </Card>
-            ))
-          )}
-        </div>
-      )}
-
-      {/* Edit File Dialog */}
-      <Dialog open={!!editFile} onOpenChange={(open) => !open && setEditFile(null)}>
-        <DialogContent className="bg-slate-900 border-slate-700 text-slate-100">
-          <DialogHeader>
-            <DialogTitle>Edit File</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="filename">File Name</Label>
-              <Input
-                id="filename"
-                value={newFileName}
-                onChange={(e) => setNewFileName(e.target.value)}
-                className="bg-slate-800 border-slate-700 text-slate-100"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="content">Content</Label>
-              <textarea
-                id="content"
-                value={newFileContent}
-                onChange={(e) => setNewFileContent(e.target.value)}
-                className="w-full h-64 bg-slate-800 border border-slate-700 rounded-md p-2 text-slate-100 font-mono text-sm"
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setEditFile(null)} className="border-slate-700 text-slate-300">
-              Cancel
-            </Button>
-            <Button onClick={handleSaveEdit} className="bg-cyan-600 hover:bg-cyan-700">
-              Save Changes
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Share File Dialog */}
-      <ShareFileDialog open={shareDialogOpen} onOpenChange={setShareDialogOpen} filename={fileToShare} />
-    </div>
-  )
-}
+    const categoryExtensions = FILE_TYPE_CATEGORIES.find((c) => c.label === category)
