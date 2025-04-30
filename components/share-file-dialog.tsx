@@ -51,6 +51,100 @@ export function ShareFileDialog({ open, onOpenChange, filename }: ShareFileDialo
       const data = await response.json()
       const fullShareUrl = `${window.location.origin}/shared/${data.id}`
       setShareLink(fullShareUrl)
+import { useToast } from "@/components/ui/use-toast"
+import { CalendarIcon, Copy, Lock } from "lucide-react"
+import { Calendar } from "@/components/ui/calendar"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { format } from "date-fns"
+import { cn } from "@/lib/utils"
+
+interface ShareFileDialogProps {
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  filename: string
+}
+
+export function ShareFileDialog({ open, onOpenChange, filename }: ShareFileDialogProps) {
+  const { toast } = useToast()
+  const [isLoading, setIsLoading] = useState(false)
+  const [shareLink, setShareLink] = useState<string | null>(null)
+  const [isPasswordProtected, setIsPasswordProtected] = useState(false)
+  const [password, setPassword] = useState("")
+  const [expiryDate, setExpiryDate] = useState<Date | undefined>(undefined)
+  const [showCalendar, setShowCalendar] = useState(false)
+
+  const handleCreateShareLink = async () => {
+    setIsLoading(true)
+    try {
+      const response = await fetch("/api/share", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          originalFilename: filename,
+          expiresAt: expiryDate?.toISOString(),
+          isPasswordProtected,
+          password: isPasswordProtected ? password : undefined,
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error("Failed to create share link")
+      }
+
+      const data = await response.json()
+      const fullShareUrl = `${window.location.origin}/shared/${data.id}`
+      setShareLink(fullShareUrl)
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
+import { Button } from "@/components/ui/button"import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Switch } from "@/components/ui/switch"
+import { useToast } from "@/components/ui/use-toast"
+import { CalendarIcon, Copy, Lock } from "lucide-react"
+import { Calendar } from "@/components/ui/calendar"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { format } from "date-fns"
+import { cn } from "@/lib/utils"
+
+interface ShareFileDialogProps {
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  filename: string
+}
+
+export function ShareFileDialog({ open, onOpenChange, filename }: ShareFileDialogProps) {
+  const { toast } = useToast()
+  const [isLoading, setIsLoading] = useState(false)
+  const [shareLink, setShareLink] = useState<string | null>(null)
+  const [isPasswordProtected, setIsPasswordProtected] = useState(false)
+  const [password, setPassword] = useState("")
+  const [expiryDate, setExpiryDate] = useState<Date | undefined>(undefined)
+  const [showCalendar, setShowCalendar] = useState(false)
+
+  const handleCreateShareLink = async () => {
+    setIsLoading(true)
+    try {
+      const response = await fetch("/api/share", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          originalFilename: filename,
+          expiresAt: expiryDate?.toISOString(),
+          isPasswordProtected,
+          password: isPasswordProtected ? password : undefined,
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error("Failed to create share link")
+      }
+
+      const data = await response.json()
+      const fullShareUrl = `${window.location.origin}/shared/${data.id}`
+      setShareLink(fullShareUrl)
 
       toast({
         title: "Share link created",
