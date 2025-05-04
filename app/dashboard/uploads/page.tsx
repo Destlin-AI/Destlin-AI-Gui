@@ -1,5 +1,7 @@
 "use client"
 
+export const dynamic = "force-dynamic";
+
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import DragAndDropUploader from "@/components/drag-and-drop-uploader"
 import { ProtectedRoute } from "@/components/protected-route"

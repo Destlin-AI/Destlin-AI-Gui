@@ -14,7 +14,7 @@ export default function ConsolePage() {
   const router = useRouter()
   const [input, setInput] = useState("")
   const [history, setHistory] = useState<{ type: "input" | "output"; content: string }[]>([
-    { type: "output", content: 'NEXUS OS Terminal v1.0.0\nType "help" for available commands.\n' },
+    { type: "output", content: 'GRAVE-MIND (build 20230429)\nType "help" for available commands.\n' },
   ])
   const [isFullscreen, setIsFullscreen] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -70,7 +70,7 @@ Available commands:
 `
         break
       case "clear":
-        setHistory([{ type: "output", content: 'NEXUS OS Terminal v1.0.0\nType "help" for available commands.\n' }])
+        setHistory([{ type: "output", content: 'GRAVE-MIND V.1.12\nType "help" for available commands.\n' }])
         return
       case "status":
         output = `
@@ -105,10 +105,10 @@ Directory listing:
         router.push("/dashboard")
         return
       case "version":
-        output = "NEXUS OS v1.0.0 (build 20230429)"
+        output = "GRAVE-MIND (build 20230429)"
         break
       case "whoami":
-        output = "admin@nexos.com (Administrator)"
+        output = "serenadad48@gmail.com (Administrator)"
         break
       case "date":
         output = new Date().toString()

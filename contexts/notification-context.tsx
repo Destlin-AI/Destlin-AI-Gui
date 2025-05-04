@@ -2,7 +2,7 @@
 
 import type React from "react"
 import { createContext, useContext, useEffect, useState } from "react"
-import { Notification } from "@/lib/notification-service"
+import type { Notification } from "@/lib/notification-service.ts"
 import { useSocket } from "@/hooks/use-socket"
 
 interface NotificationContextType {
